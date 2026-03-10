@@ -76,7 +76,7 @@ async function main(): Promise<void> {
 
       const contentId = `c-${nanoid(12)}`
       const voice = cm.genome.voice ?? config.voices[0]!
-      const speechRate = cm.genome.speechRate ?? '0%'
+      const speechRate = cm.genome.speechRate ?? '+0%'
 
       // Pick background and music upfront using genome-aware asset acquisition
       let backgroundClip = 'default'
