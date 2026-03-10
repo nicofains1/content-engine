@@ -4,3 +4,9 @@ data/
 config.json
 *.log
 .DS_Store
+credentials.json
+youtube-token.json
+config.json
+data/
+logs/
+dist/
