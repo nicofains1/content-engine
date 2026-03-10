@@ -11,7 +11,7 @@ export interface RedditPost {
   top_comment?: string
 }
 
-export type ContentStatus = 'pending' | 'generating' | 'ready' | 'failed'
+export type ContentStatus = 'pending' | 'generating' | 'ready' | 'posted' | 'failed'
 
 export interface Content {
   id: string
