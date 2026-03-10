@@ -14,12 +14,15 @@ def main():
 
     try:
         from tiktok_uploader.upload import upload_video
-        upload_video(
-            video=video,
+        failed = upload_video(
+            filename=video,
             description=description,
             cookies=cookies,
-            headless=True
+            headless=True,
+            browser='chromium'
         )
+        if failed:
+            raise Exception(f"Upload failed: {failed}")
         print(json.dumps({"status": "ok"}))
     except ImportError:
         print(json.dumps({"status": "error", "message": "tiktok_uploader not installed"}))
