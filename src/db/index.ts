@@ -187,6 +187,139 @@ export function getAllActiveCMs(db: Database.Database): Array<Record<string, unk
   return db.prepare("SELECT * FROM cms WHERE status != 'dead'").all() as Array<Record<string, unknown>>
 }
 
+export function getDailyMetrics(db: Database.Database, dateStr: string): {
+  totalViews: number
+  totalLikes: number
+  totalComments: number
+  videosPosted: number
+  bestVideoTitle: string | null
+  bestVideoViews: number
+} {
+  const row = db.prepare(`
+    SELECT
+      COALESCE(SUM(latest.views), 0) as totalViews,
+      COALESCE(SUM(latest.likes), 0) as totalLikes,
+      COALESCE(SUM(latest.comments), 0) as totalComments,
+      COUNT(DISTINCT p.id) as videosPosted,
+      MAX(latest.views) as bestVideoViews
+    FROM posts p
+    JOIN content c ON c.id = p.content_id
+    LEFT JOIN (
+      SELECT post_id, views, likes, comments
+      FROM metrics
+      WHERE id IN (SELECT MAX(id) FROM metrics GROUP BY post_id)
+    ) latest ON latest.post_id = p.id
+    WHERE p.platform = 'youtube' AND p.status = 'posted'
+      AND date(p.posted_at) = ?
+  `).get(dateStr) as {
+    totalViews: number; totalLikes: number; totalComments: number
+    videosPosted: number; bestVideoViews: number
+  }
+
+  const bestRow = db.prepare(`
+    SELECT c.script
+    FROM posts p
+    JOIN content c ON c.id = p.content_id
+    LEFT JOIN (
+      SELECT post_id, views FROM metrics
+      WHERE id IN (SELECT MAX(id) FROM metrics GROUP BY post_id)
+    ) latest ON latest.post_id = p.id
+    WHERE p.platform = 'youtube' AND p.status = 'posted'
+      AND date(p.posted_at) = ?
+    ORDER BY latest.views DESC
+    LIMIT 1
+  `).get(dateStr) as { script: string } | undefined
+
+  return {
+    totalViews: row.totalViews ?? 0,
+    totalLikes: row.totalLikes ?? 0,
+    totalComments: row.totalComments ?? 0,
+    videosPosted: row.videosPosted ?? 0,
+    bestVideoViews: row.bestVideoViews ?? 0,
+    bestVideoTitle: bestRow ? bestRow.script.slice(0, 80).replace(/\n/g, ' ') : null,
+  }
+}
+
+export function getWeeklyMetrics(db: Database.Database): {
+  totalViews: number
+  videosPosted: number
+  avgViews: number
+  bestVideoTitle: string | null
+  bestVideoViews: number
+  cmStats: Array<{ cmId: string; avgViews: number; videos: number }>
+  prevWeekAvgViews: number
+} {
+  const weekRow = db.prepare(`
+    SELECT
+      COALESCE(SUM(latest.views), 0) as totalViews,
+      COUNT(DISTINCT p.id) as videosPosted,
+      COALESCE(AVG(latest.views), 0) as avgViews,
+      MAX(latest.views) as bestVideoViews
+    FROM posts p
+    JOIN content c ON c.id = p.content_id
+    LEFT JOIN (
+      SELECT post_id, views FROM metrics
+      WHERE id IN (SELECT MAX(id) FROM metrics GROUP BY post_id)
+    ) latest ON latest.post_id = p.id
+    WHERE p.platform = 'youtube' AND p.status = 'posted'
+      AND p.posted_at >= datetime('now', '-7 days')
+  `).get() as { totalViews: number; videosPosted: number; avgViews: number; bestVideoViews: number }
+
+  const bestRow = db.prepare(`
+    SELECT c.script
+    FROM posts p
+    JOIN content c ON c.id = p.content_id
+    LEFT JOIN (
+      SELECT post_id, views FROM metrics
+      WHERE id IN (SELECT MAX(id) FROM metrics GROUP BY post_id)
+    ) latest ON latest.post_id = p.id
+    WHERE p.platform = 'youtube' AND p.status = 'posted'
+      AND p.posted_at >= datetime('now', '-7 days')
+    ORDER BY latest.views DESC
+    LIMIT 1
+  `).get() as { script: string } | undefined
+
+  const cmRows = db.prepare(`
+    SELECT
+      c.cm_id as cmId,
+      COALESCE(AVG(latest.views), 0) as avgViews,
+      COUNT(DISTINCT p.id) as videos
+    FROM posts p
+    JOIN content c ON c.id = p.content_id
+    LEFT JOIN (
+      SELECT post_id, views FROM metrics
+      WHERE id IN (SELECT MAX(id) FROM metrics GROUP BY post_id)
+    ) latest ON latest.post_id = p.id
+    WHERE p.platform = 'youtube' AND p.status = 'posted'
+      AND p.posted_at >= datetime('now', '-7 days')
+    GROUP BY c.cm_id
+    ORDER BY avgViews DESC
+  `).all() as Array<{ cmId: string; avgViews: number; videos: number }>
+
+  const prevRow = db.prepare(`
+    SELECT COALESCE(AVG(latest.views), 0) as avgViews
+    FROM posts p
+    JOIN content c ON c.id = p.content_id
+    LEFT JOIN (
+      SELECT post_id, views FROM metrics
+      WHERE id IN (SELECT MAX(id) FROM metrics GROUP BY post_id)
+    ) latest ON latest.post_id = p.id
+    WHERE p.platform = 'youtube' AND p.status = 'posted'
+      AND p.posted_at >= datetime('now', '-14 days')
+      AND p.posted_at < datetime('now', '-7 days')
+  `).get() as { avgViews: number }
+
+  return {
+    totalViews: weekRow.totalViews ?? 0,
+    videosPosted: weekRow.videosPosted ?? 0,
+    avgViews: weekRow.avgViews ?? 0,
+    bestVideoViews: weekRow.bestVideoViews ?? 0,
+    bestVideoTitle: bestRow ? bestRow.script.slice(0, 80).replace(/\n/g, ' ') : null,
+    cmStats: cmRows,
+    prevWeekAvgViews: prevRow.avgViews ?? 0,
+  }
+}
+
 export function insertCM(db: Database.Database, cm: {
   id: string; generation: number; parent_id?: string; genome: string; status: string
 }): void {
