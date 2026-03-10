@@ -4,9 +4,14 @@ import { join } from 'path'
 import { spawn } from 'child_process'
 import type { Config } from '../types/index.js'
 
+const M1_BIN_PATH = '/Users/nfainstein/bin:/usr/local/bin:/opt/homebrew/bin'
+
 function spawnAsync(cmd: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] })
+    const proc = spawn(cmd, args, {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env: { ...process.env, PATH: `${process.env.PATH}:${M1_BIN_PATH}` }
+    })
     let stderr = ''
     proc.stderr?.on('data', (d: Buffer) => { stderr += d.toString() })
     proc.on('close', code => code === 0 ? resolve() : reject(new Error(`${cmd} failed (code ${code}): ${stderr.slice(0, 500)}`)))
