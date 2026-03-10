@@ -155,9 +155,9 @@ async function main(): Promise<void> {
           video_path: outputPath,
         })
 
-        // Update content with caption and hashtags too
-        db.prepare(`UPDATE content SET caption = ?, hashtags = ? WHERE id = ?`)
-          .run(content.caption, content.hashtags, contentId)
+        // Save script, caption, hashtags for learn job analysis
+        db.prepare(`UPDATE content SET script = ?, caption = ?, hashtags = ? WHERE id = ?`)
+          .run(content.script, content.caption, content.hashtags, contentId)
 
         logger.info({ contentId, outputPath }, 'Video ready')
         generated++
