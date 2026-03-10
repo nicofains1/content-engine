@@ -15,6 +15,9 @@
     "baileys": "npm:@whiskeysockets/baileys@^6.7.0",
     "nanoid": "^5.0.7"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "@whiskeysockets/baileys", "esbuild", "protobufjs", "sharp"]
+  },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
     "@types/node": "^22.0.0",
