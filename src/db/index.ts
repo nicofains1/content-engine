@@ -111,6 +111,56 @@ export function getPostedYouTubeVideos(db: Database.Database): Array<{ id: numbe
   `).all() as Array<{ id: number; platform_post_id: string; cm_id: string }>
 }
 
+export function getStaleYouTubePosts(db: Database.Database, staleHours = 12): Array<{ id: number; platform_post_id: string; cm_id: string }> {
+  return db.prepare(`
+    SELECT p.id, p.platform_post_id, c.cm_id
+    FROM posts p
+    JOIN content c ON c.id = p.content_id
+    WHERE p.platform = 'youtube'
+      AND p.status = 'posted'
+      AND p.platform_post_id IS NOT NULL
+      AND (
+        NOT EXISTS (SELECT 1 FROM metrics m WHERE m.post_id = p.id)
+        OR (
+          SELECT MAX(m.collected_at) FROM metrics m WHERE m.post_id = p.id
+        ) < datetime('now', '-' || ? || ' hours')
+      )
+  `).all(staleHours) as Array<{ id: number; platform_post_id: string; cm_id: string }>
+}
+
+export function getCMVideoStats(db: Database.Database, cmId: string): {
+  total_views: number; total_likes: number; total_comments: number;
+  avg_views: number; best_video_views: number; videos_generated: number
+} {
+  const row = db.prepare(`
+    SELECT
+      COALESCE(SUM(latest.views), 0) as total_views,
+      COALESCE(SUM(latest.likes), 0) as total_likes,
+      COALESCE(SUM(latest.comments), 0) as total_comments,
+      COALESCE(AVG(latest.views), 0) as avg_views,
+      COALESCE(MAX(latest.views), 0) as best_video_views,
+      COUNT(DISTINCT p.id) as videos_generated
+    FROM posts p
+    JOIN content c ON c.id = p.content_id
+    LEFT JOIN (
+      SELECT post_id, views, likes, comments
+      FROM metrics
+      WHERE id IN (
+        SELECT MAX(id) FROM metrics GROUP BY post_id
+      )
+    ) latest ON latest.post_id = p.id
+    WHERE c.cm_id = ? AND p.platform = 'youtube' AND p.status = 'posted'
+  `).get(cmId) as any
+  return {
+    total_views: row.total_views ?? 0,
+    total_likes: row.total_likes ?? 0,
+    total_comments: row.total_comments ?? 0,
+    avg_views: row.avg_views ?? 0,
+    best_video_views: row.best_video_views ?? 0,
+    videos_generated: row.videos_generated ?? 0,
+  }
+}
+
 export function insertMetric(db: Database.Database, metric: {
   post_id: number; views: number; likes: number; comments: number; shares: number
 }): void {
