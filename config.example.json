@@ -38,5 +38,8 @@
   "cleanup": {
     "maxAgeDays": 30,
     "minFreeDiskGB": 5
+  },
+  "pexels": {
+    "apiKey": ""
   }
 }

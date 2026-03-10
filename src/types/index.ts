@@ -74,7 +74,12 @@ export interface Genome {
   subtitleStyle: string
   subtitleColor: string
   subtitlePosition: string
+  subtitleSize: number
   backgroundPreference: string
+  backgroundQuery: string
+  backgroundSource: 'pexels' | 'generated'
+  musicGenre: string | null
+  fontName: string
   preferredSubreddits: string[]
   minRedditScore: number
   captionStyle: string
@@ -136,5 +141,8 @@ export interface Config {
   cleanup: {
     maxAgeDays: number
     minFreeDiskGB: number
+  }
+  pexels?: {
+    apiKey: string
   }
 }

@@ -17,7 +17,12 @@ const GENOME_FIELDS: (keyof Genome)[] = [
   'subtitleStyle',
   'subtitleColor',
   'subtitlePosition',
+  'subtitleSize',
   'backgroundPreference',
+  'backgroundQuery',
+  'backgroundSource',
+  'musicGenre',
+  'fontName',
   'preferredSubreddits',
   'minRedditScore',
   'captionStyle',
@@ -36,10 +41,26 @@ const STRUCTURES = ['hook-desarrollo-cierre', '3-datos-rapidos', 'historia-corta
 const CLOSING_STYLES = ['pregunta_comentarios', 'call_to_follow', 'dato_bonus', 'cliffhanger']
 const VOICES = ['es-MX-JorgeNeural', 'es-AR-TomasNeural', 'es-ES-AlvaroNeural', 'es-MX-DaliaNeural']
 const SPEECH_RATES = ['-10%', '0%', '+5%', '+10%', '+15%']
-const SUBTITLE_STYLES = ['bold_white', 'yellow_highlight', 'outline_black', 'gradient']
-const SUBTITLE_COLORS = ['#FFFFFF', '#FFFF00', '#00FF00', '#FF6B6B']
-const SUBTITLE_POSITIONS = ['bottom', 'center', 'top']
+const SUBTITLE_STYLES = ['bold_white', 'yellow_highlight', 'outline_black', 'gradient', 'karaoke_grande', 'karaoke_chico', 'linea_completa']
+const SUBTITLE_COLORS = ['#FFFFFF', '#FFFF00', '#00FF00', '#FF6B6B', '#FF4444']
+const SUBTITLE_POSITIONS = ['abajo', 'centro', 'arriba']
+const SUBTITLE_SIZES = [14, 16, 18, 20, 22]
 const BACKGROUND_PREFS = ['gameplay', 'nature', 'abstract', 'cityscape', 'any']
+const BACKGROUND_QUERIES = [
+  'space galaxy nebula',
+  'minecraft gameplay parkour',
+  'ocean waves beach',
+  'city timelapse aerial',
+  'abstract particles dark',
+  'forest nature waterfall',
+  'fire flames abstract',
+  'underwater ocean deep sea',
+  'mountain landscape sunset',
+  'tokyo streets night',
+]
+const BACKGROUND_SOURCES: Array<'pexels' | 'generated'> = ['pexels', 'pexels', 'pexels', 'generated']
+const MUSIC_GENRES: Array<string | null> = ['ambient', 'corporate', 'horror', null, null, 'ambient']
+const FONT_NAMES = ['Montserrat', 'Anton', 'Roboto', 'Oswald', 'Bebas Neue']
 const SUBREDDITS = ['todayilearned', 'Showerthoughts', 'explainlikeimfive', 'interestingasfuck', 'mildlyinteresting', 'science', 'history']
 const CAPTION_STYLES = ['corto_impactante', 'con_emoji', 'pregunta', 'afirmacion']
 
@@ -63,8 +84,13 @@ export function randomGenome(voices: string[] = VOICES): Genome {
     musicVolume: parseFloat((Math.random() * 0.2 + 0.05).toFixed(2)),
     subtitleStyle: randomFrom(SUBTITLE_STYLES),
     subtitleColor: randomFrom(SUBTITLE_COLORS),
+    subtitleSize: randomFrom(SUBTITLE_SIZES),
     subtitlePosition: randomFrom(SUBTITLE_POSITIONS),
     backgroundPreference: randomFrom(BACKGROUND_PREFS),
+    backgroundQuery: randomFrom(BACKGROUND_QUERIES),
+    backgroundSource: randomFrom(BACKGROUND_SOURCES),
+    musicGenre: randomFrom(MUSIC_GENRES),
+    fontName: randomFrom(FONT_NAMES),
     preferredSubreddits: [randomFrom(SUBREDDITS), randomFrom(SUBREDDITS)].filter((v, i, a) => a.indexOf(v) === i),
     minRedditScore: randomFrom([1000, 3000, 5000, 10000]),
     captionStyle: randomFrom(CAPTION_STYLES),
@@ -89,8 +115,13 @@ function mutateGenome(genome: Genome, fieldsToMutate = randomInt(1, 3)): Genome 
       case 'musicVolume': result.musicVolume = parseFloat((Math.random() * 0.2 + 0.05).toFixed(2)); break
       case 'subtitleStyle': result.subtitleStyle = randomFrom(SUBTITLE_STYLES); break
       case 'subtitleColor': result.subtitleColor = randomFrom(SUBTITLE_COLORS); break
+      case 'subtitleSize': result.subtitleSize = randomFrom(SUBTITLE_SIZES); break
       case 'subtitlePosition': result.subtitlePosition = randomFrom(SUBTITLE_POSITIONS); break
       case 'backgroundPreference': result.backgroundPreference = randomFrom(BACKGROUND_PREFS); break
+      case 'backgroundQuery': result.backgroundQuery = randomFrom(BACKGROUND_QUERIES); break
+      case 'backgroundSource': result.backgroundSource = randomFrom(BACKGROUND_SOURCES); break
+      case 'musicGenre': result.musicGenre = randomFrom(MUSIC_GENRES); break
+      case 'fontName': result.fontName = randomFrom(FONT_NAMES); break
       case 'preferredSubreddits': result.preferredSubreddits = [randomFrom(SUBREDDITS), randomFrom(SUBREDDITS)]; break
       case 'minRedditScore': result.minRedditScore = randomFrom([1000, 3000, 5000, 10000]); break
       case 'captionStyle': result.captionStyle = randomFrom(CAPTION_STYLES); break

@@ -1,6 +1,8 @@
 import { spawn } from 'child_process'
 import { readdirSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
+import type { Genome, Config } from '../types/index.js'
+import { getOrFetchBackground, getOrFetchMusic } from './asset-manager.js'
 
 export interface VideoOptions {
   audioPath: string
@@ -40,10 +42,18 @@ export function pickBackgroundClip(backgroundsDir: string, preference: string): 
   return join(backgroundsDir, pickRandom(files))
 }
 
+export async function pickBackgroundClipFromGenome(genome: Genome, config: Config): Promise<string> {
+  return getOrFetchBackground(genome.backgroundQuery ?? genome.backgroundPreference ?? 'abstract', config)
+}
+
 export function pickMusicTrack(musicDir: string): string {
   const files = readdirSync(musicDir).filter(f => /\.(mp3|m4a|wav|flac)$/i.test(f))
   if (files.length === 0) throw new Error(`No music tracks found in ${musicDir}`)
   return join(musicDir, pickRandom(files))
+}
+
+export async function pickMusicTrackFromGenome(genome: Genome, config: Config): Promise<string | null> {
+  return getOrFetchMusic(genome.musicGenre ?? null, config)
 }
 
 function getSubtitleForceStyle(opts: VideoOptions): string {

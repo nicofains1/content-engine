@@ -11,7 +11,7 @@ import {
 import { fetchTopPosts } from '../services/reddit.js'
 import { generateContent } from '../services/content.js'
 import { generateTTS } from '../services/tts.js'
-import { generateVideo, pickBackgroundClip, pickMusicTrack } from '../services/video.js'
+import { generateVideo, pickBackgroundClip, pickMusicTrack, pickBackgroundClipFromGenome, pickMusicTrackFromGenome } from '../services/video.js'
 import { selectCM, createInitialPopulation } from '../darwin/population.js'
 import type { CM } from '../types/index.js'
 import { nanoid } from 'nanoid'
@@ -78,14 +78,27 @@ async function main(): Promise<void> {
       const voice = cm.genome.voice ?? config.voices[0]!
       const speechRate = cm.genome.speechRate ?? '0%'
 
-      // Pick background and music upfront
+      // Pick background and music upfront using genome-aware asset acquisition
       let backgroundClip = 'default'
       let musicTrack = 'default'
       try {
-        backgroundClip = pickBackgroundClip(config.paths.backgroundsDir, cm.genome.backgroundPreference)
-        musicTrack = pickMusicTrack(config.paths.musicDir)
+        backgroundClip = await pickBackgroundClipFromGenome(cm.genome, config)
       } catch {
-        // No backgrounds/music yet - will be downloaded before deployment
+        try {
+          backgroundClip = pickBackgroundClip(config.paths.backgroundsDir, cm.genome.backgroundPreference)
+        } catch {
+          // No backgrounds available yet
+        }
+      }
+      try {
+        const track = await pickMusicTrackFromGenome(cm.genome, config)
+        if (track) musicTrack = track
+      } catch {
+        try {
+          musicTrack = pickMusicTrack(config.paths.musicDir)
+        } catch {
+          // No music available yet
+        }
       }
 
       insertContent(db, {
