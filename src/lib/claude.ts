@@ -3,9 +3,10 @@ import { spawn } from 'child_process'
 
 export async function invokeClaude(prompt: string, timeoutMs = 120_000): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn('claude', ['-p', '--output-format', 'text'], {
+    const claudePath = process.env.CLAUDE_PATH ?? '/Users/nfainstein/.local/bin/claude'
+    const proc = spawn(claudePath, ['-p', '--output-format', 'text'], {
       timeout: timeoutMs,
-      env: { ...process.env },
+      env: { ...process.env, PATH: `${process.env.PATH}:/Users/nfainstein/.local/bin:/usr/local/bin` },
     })
 
     proc.stdin.write(prompt)
