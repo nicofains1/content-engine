@@ -2,6 +2,7 @@
 import { nanoid } from 'nanoid'
 import type Database from 'better-sqlite3'
 import type { CM, Genome } from '../types/index.js'
+import type { Logger } from 'pino'
 import { insertCM, getAllActiveCMs } from '../db/index.js'
 
 const GENOME_FIELDS: (keyof Genome)[] = [
@@ -197,6 +198,56 @@ export function evaluatePopulation(
   }
 
   return { toKill, toReproduce }
+}
+
+export interface PopulationEvalResult {
+  killed: string[]
+  reproduced: string[]
+  population: CM[]
+}
+
+export function runPopulationEvaluation(
+  db: Database.Database,
+  logger: Logger,
+  opts: {
+    gracePeriodVideos?: number
+    minPopulation?: number
+    maxPopulation?: number
+    killThreshold?: number
+    reproduceThreshold?: number
+  } = {}
+): PopulationEvalResult {
+  const rawCMs = getAllActiveCMs(db)
+  const cms: CM[] = rawCMs.map(r => parseCM(r))
+
+  const { toKill, toReproduce } = evaluatePopulation(cms, opts)
+
+  const killed: string[] = []
+  const reproduced: string[] = []
+
+  for (const cm of toKill) {
+    db.prepare("UPDATE cms SET status = 'dead', died_at = datetime('now'), death_reason = 'below_kill_threshold' WHERE id = ?")
+      .run(cm.id)
+    killed.push(cm.id)
+    logger.info({ cmId: cm.id, avgViews: cm.avg_views }, 'CM killed by Darwin')
+  }
+
+  for (const { parent, childGenome, childId } of toReproduce) {
+    insertCM(db, {
+      id: childId,
+      generation: parent.generation + 1,
+      parent_id: parent.id,
+      genome: JSON.stringify(childGenome),
+      status: 'active',
+    })
+    reproduced.push(childId)
+    logger.info({ parentId: parent.id, childId, generation: parent.generation + 1 }, 'CM reproduced')
+  }
+
+  const updatedRaw = getAllActiveCMs(db)
+  const population: CM[] = updatedRaw.map(r => parseCM(r))
+
+  return { killed, reproduced, population }
 }
 
 export function createInitialPopulation(size = 3, voices: string[] = VOICES): Array<{
