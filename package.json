@@ -1,0 +1,24 @@
+{
+  "name": "content-engine",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "googleapis": "^140.0.0",
+    "pino": "^9.0.0",
+    "baileys": "npm:@whiskeysockets/baileys@^6.7.0",
+    "nanoid": "^5.0.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}
