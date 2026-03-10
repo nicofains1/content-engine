@@ -18,15 +18,9 @@ export function loadConfig(): Config {
   const raw = JSON.parse(readFileSync(configPath, 'utf-8')) as Partial<Config>
 
   // Validate required fields
-  if (!raw.reddit?.clientId) throw new Error('config.json: missing reddit.clientId')
-  if (!raw.reddit?.clientSecret) throw new Error('config.json: missing reddit.clientSecret')
-  if (!raw.reddit?.username) throw new Error('config.json: missing reddit.username')
-  if (!raw.reddit?.password) throw new Error('config.json: missing reddit.password')
-  if (!raw.reddit?.userAgent) throw new Error('config.json: missing reddit.userAgent')
   if (!raw.youtube?.clientId) throw new Error('config.json: missing youtube.clientId')
   if (!raw.youtube?.clientSecret) throw new Error('config.json: missing youtube.clientSecret')
   if (!raw.youtube?.refreshToken) throw new Error('config.json: missing youtube.refreshToken')
-  if (!raw.tiktok?.cookiesPath) throw new Error('config.json: missing tiktok.cookiesPath')
   if (!raw.paths?.dataDir) throw new Error('config.json: missing paths.dataDir')
   if (!raw.paths?.backgroundsDir) throw new Error('config.json: missing paths.backgroundsDir')
   if (!raw.paths?.musicDir) throw new Error('config.json: missing paths.musicDir')
