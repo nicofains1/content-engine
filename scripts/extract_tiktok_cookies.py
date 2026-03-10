@@ -75,13 +75,29 @@ def decrypt_cookie(encrypted_value: bytes, key_v10: bytes, key_v11: bytes) -> st
 
 
 def find_arc_cookies_db() -> Path:
-    """Find Arc browser's Cookies SQLite database."""
+    """Find Arc browser's Cookies SQLite database with most TikTok cookies."""
     base = Path.home() / 'Library' / 'Application Support' / 'Arc' / 'User Data'
-    # Search all profiles
+    best_path = None
+    best_count = -1
     for cookies_path in base.rglob('Cookies'):
-        if cookies_path.is_file():
-            return cookies_path
-    raise FileNotFoundError(f"Arc Cookies DB not found under {base}")
+        if not cookies_path.is_file():
+            continue
+        try:
+            tmp = tempfile.mktemp(suffix='.db')
+            shutil.copy2(cookies_path, tmp)
+            conn = sqlite3.connect(tmp)
+            count = conn.execute("SELECT COUNT(*) FROM cookies WHERE host_key LIKE '%tiktok.com%'").fetchone()[0]
+            conn.close()
+            os.unlink(tmp)
+            if count > best_count:
+                best_count = count
+                best_path = cookies_path
+        except Exception:
+            pass
+    if best_path is None:
+        raise FileNotFoundError(f"Arc Cookies DB not found under {base}")
+    print(f"Using profile with {best_count} TikTok cookies: {best_path}", file=sys.stderr)
+    return best_path
 
 
 def extract_tiktok_cookies(output_path: str):
