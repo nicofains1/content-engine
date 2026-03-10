@@ -13,9 +13,13 @@ function ensureDir(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true })
 }
 
+const EDGE_TTS_PATH = process.env.EDGE_TTS_PATH ?? '/Users/nfainstein/Library/Python/3.9/bin/edge-tts'
+
 function spawnAsync(cmd: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args)
+    const proc = spawn(cmd, args, {
+      env: { ...process.env, PATH: `${process.env.PATH}:/Users/nfainstein/Library/Python/3.9/bin:/usr/local/bin` }
+    })
     let stderr = ''
     proc.stderr.on('data', (d: Buffer) => { stderr += d.toString() })
     proc.on('close', (code) => {
@@ -28,7 +32,7 @@ function spawnAsync(cmd: string, args: string[]): Promise<void> {
 
 async function runEdgeTts(text: string, voice: string, rate: string, audioOut: string, subOut: string): Promise<void> {
   ensureDir(audioOut)
-  await spawnAsync('edge-tts', [
+  await spawnAsync(EDGE_TTS_PATH, [
     '--voice', voice,
     '--rate', rate,
     '--text', text,
