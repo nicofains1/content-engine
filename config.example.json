@@ -1,11 +1,4 @@
 {
-  "reddit": {
-    "clientId": "YOUR_CLIENT_ID",
-    "clientSecret": "YOUR_CLIENT_SECRET",
-    "username": "YOUR_USERNAME",
-    "password": "YOUR_PASSWORD",
-    "userAgent": "content-engine/1.0"
-  },
   "youtube": {
     "clientId": "YOUR_CLIENT_ID.apps.googleusercontent.com",
     "clientSecret": "YOUR_CLIENT_SECRET",
@@ -18,14 +11,23 @@
     "enabled": true,
     "whatsappGroupJid": "120363xxx@g.us"
   },
-  "subreddits": ["todayilearned", "Showerthoughts", "explainlikeimfive", "interestingasfuck", "mildlyinteresting"],
+  "subreddits": [
+    "todayilearned",
+    "Showerthoughts",
+    "explainlikeimfive",
+    "interestingasfuck",
+    "mildlyinteresting"
+  ],
   "content": {
     "minRedditScore": 5000,
-    "minUpvoteRatio": 0.90,
+    "minUpvoteRatio": 0.9,
     "videosPerRun": 1,
     "targetDurationSeconds": 45
   },
-  "voices": ["es-MX-JorgeNeural", "es-AR-TomasNeural"],
+  "voices": [
+    "es-MX-JorgeNeural",
+    "es-AR-TomasNeural"
+  ],
   "paths": {
     "dataDir": "/Users/nfainstein/content-engine/data",
     "backgroundsDir": "/Users/nfainstein/content-engine/data/backgrounds",

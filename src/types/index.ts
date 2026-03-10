@@ -99,12 +99,12 @@ export interface CM {
 }
 
 export interface Config {
-  reddit: {
-    clientId: string
-    clientSecret: string
-    username: string
-    password: string
-    userAgent: string
+  reddit?: {
+    clientId?: string
+    clientSecret?: string
+    username?: string
+    password?: string
+    userAgent?: string
   }
   youtube: {
     clientId: string
