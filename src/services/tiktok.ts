@@ -14,7 +14,8 @@ export interface TikTokUploadOptions {
 
 async function runPythonScript(args: Record<string, string>): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn('python3', [SCRIPT_PATH, JSON.stringify(args)], {
+    const python = process.env.PYTHON3_PATH ?? '/opt/homebrew/bin/python3.11'
+    const proc = spawn(python, [SCRIPT_PATH, JSON.stringify(args)], {
       timeout: 300_000, // 5 minutes
     })
 
