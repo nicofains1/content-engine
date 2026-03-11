@@ -39,6 +39,32 @@ def derive_key(password: bytes, key_length: int) -> bytes:
     return PBKDF2(password, b'saltysalt', dkLen=key_length, count=1003)
 
 
+def _strip_binary_prefix(raw: bytes) -> str:
+    """Strip binary header bytes that some Arc/Chromium versions prepend to cookie values.
+
+    After decryption the plaintext may start with ~16-32 bytes of binary metadata
+    before the actual ASCII cookie value. This operates on the raw bytes directly
+    to avoid UTF-8 replacement char expansion confusing the search offsets.
+
+    Strategy:
+    1. Look for 32+ consecutive lowercase hex bytes (sessionid, odin_tt, etc.)
+    2. Fall back to first 8+ bytes of printable URL-safe ASCII (msToken, ttwid, etc.)
+    """
+    import re
+    # Work in ASCII/latin-1 to avoid UTF-8 multi-byte expansion
+    s = raw.decode('latin-1')
+    # Priority: pure lowercase hex (32+ chars) - typical for TikTok session tokens
+    m = re.search(r'[0-9a-f]{32,}', s)
+    if m:
+        # Return from the start of the hex match to end of decoded string
+        return s[m.start():]
+    # Fallback: first long run of URL-safe printable ASCII
+    m = re.search(r'[a-zA-Z0-9%_\-\.;=+@:!/]{8,}', s)
+    if m:
+        return s[m.start():]
+    return s
+
+
 def decrypt_cookie(encrypted_value: bytes, key_v10: bytes, key_v11: bytes) -> str:
     """Decrypt a cookie value supporting both v10 and v11 formats."""
     if encrypted_value[:3] == b'v11':
@@ -50,21 +76,40 @@ def decrypt_cookie(encrypted_value: bytes, key_v10: bytes, key_v11: bytes) -> st
             cipher = AES.new(key_v11, AES.MODE_GCM, nonce=iv)
             decrypted = cipher.decrypt_and_verify(ciphertext, tag)
             return decrypted.decode('utf-8', errors='replace')
-        except Exception as e:
+        except Exception:
             return ''
     elif encrypted_value[:3] == b'v10':
-        # AES-128-CBC: IV is 16 spaces, ciphertext starts at byte 3
-        iv = b' ' * 16
-        ciphertext = encrypted_value[3:]
+        # Try 1: Arc embeds the IV in bytes 3:19, ciphertext starts at 19
+        # (some Arc/Chromium versions use random per-cookie IVs instead of 16 spaces)
+        if len(encrypted_value) > 19:
+            try:
+                iv_embedded = encrypted_value[3:19]
+                ct_embedded = encrypted_value[19:]
+                if len(ct_embedded) % 16 == 0:
+                    cipher = AES.new(key_v10, AES.MODE_CBC, IV=iv_embedded)
+                    raw = cipher.decrypt(ct_embedded)
+                    pad_len = raw[-1]
+                    if 1 <= pad_len <= 16:
+                        raw = raw[:-pad_len]
+                    result = raw.decode('utf-8', errors='replace')
+                    # Valid if it's clean printable ASCII (no replacement chars at start)
+                    if result and all(ord(c) < 128 and c.isprintable() for c in result[:8]):
+                        return result
+            except Exception:
+                pass
+
+        # Try 2: Standard Chrome v10 - IV = 16 spaces, ciphertext at byte 3
+        # Arc may prepend a binary metadata header to the plaintext; strip it.
         try:
+            iv = b' ' * 16
+            ciphertext = encrypted_value[3:]
             cipher = AES.new(key_v10, AES.MODE_CBC, IV=iv)
-            decrypted = cipher.decrypt(ciphertext)
-            # Remove PKCS7 padding
-            pad_len = decrypted[-1]
-            if pad_len <= 16:
-                decrypted = decrypted[:-pad_len]
-            return decrypted.decode('utf-8', errors='replace')
-        except Exception as e:
+            raw = cipher.decrypt(ciphertext)
+            pad_len = raw[-1]
+            if 1 <= pad_len <= 16:
+                raw = raw[:-pad_len]
+            return _strip_binary_prefix(raw)
+        except Exception:
             return ''
     else:
         # Unencrypted
