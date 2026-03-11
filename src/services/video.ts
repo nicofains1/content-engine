@@ -61,11 +61,20 @@ export async function pickMusicTrackFromGenome(genome: Genome, config: Config): 
   return getOrFetchMusic(genome.musicGenre ?? null, config)
 }
 
+function hexToAssColor(hex: string): string {
+  // ASS format is &HAABBGGRR (little-endian RGB, AA=00 = opaque)
+  const r = hex.slice(1, 3)
+  const g = hex.slice(3, 5)
+  const b = hex.slice(5, 7)
+  return `&H00${b}${g}${r}`.toUpperCase()
+}
+
 function getSubtitleForceStyle(opts: VideoOptions): string {
-  const size = opts.subtitleStyle === 'karaoke_grande' ? 22 : opts.subtitleStyle === 'karaoke_chico' ? 16 : 18
-  const color = opts.subtitleColor.replace('#', '&H00')
-  const marginV = opts.subtitlePosition === 'abajo' ? 80 : opts.subtitlePosition === 'arriba' ? 850 : 500
-  return `FontName=Montserrat-Bold,FontSize=${size},PrimaryColour=${color},OutlineColour=&H00000000,Outline=2,BorderStyle=1,Alignment=2,MarginV=${marginV}`
+  const size = opts.subtitleStyle === 'karaoke_grande' ? 24 : opts.subtitleStyle === 'karaoke_chico' ? 18 : 20
+  const color = hexToAssColor(opts.subtitleColor)
+  const marginV = opts.subtitlePosition === 'abajo' ? 100 : opts.subtitlePosition === 'arriba' ? 800 : 500
+  // Arial is always available on macOS; Bold=1, shadow for readability
+  return `FontName=Arial,Bold=1,FontSize=${size},PrimaryColour=${color},OutlineColour=&H00000000,ShadowColour=&H80000000,Outline=3,Shadow=1,BorderStyle=1,Alignment=2,MarginV=${marginV}`
 }
 
 export async function generateVideo(opts: VideoOptions): Promise<string> {
