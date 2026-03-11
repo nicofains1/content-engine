@@ -74,23 +74,31 @@ export async function generateAbstractBackground(outputPath: string, durationSec
   const dir = outputPath.split('/').slice(0, -1).join('/')
   if (dir) mkdirSync(dir, { recursive: true })
 
+  // Animated cosmic gradient: deep blues/purples with light wave shimmer
+  // Each channel uses multiple sine waves at different frequencies and speeds
+  const geqR = `clip(sin((X+Y)/90+t*1.2)*25+sin(X/130-t*1.8)*18+8,0,255)`
+  const geqG = `clip(sin((X+Y)/110+t*0.8)*12+sin(Y/100+t*1.5)*20+12,0,255)`
+  const geqB = `clip(sin(Y/70-t*2.5)*90+sin(X/80+t*1.8)*55+70,0,255)`
+
   const args = [
     '-y',
     '-f', 'lavfi',
-    '-i', `color=c=0x1a0533:s=1080x1920:r=30,geq=r='r(X,Y)*sin(N/30)':g='g(X,Y)*cos(N/25)':b='b(X,Y)',format=yuv420p`,
+    '-i', `color=c=0x08082a:s=1080x1920:r=30,geq=r='${geqR}':g='${geqG}':b='${geqB}',format=yuv420p`,
     '-t', String(durationSeconds),
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
     outputPath,
   ]
 
   try {
     await spawnAsync('ffmpeg', args)
   } catch {
-    // simpler fallback: solid color gradient
+    // simple dark gradient fallback
     const fallbackArgs = [
       '-y',
       '-f', 'lavfi',
-      '-i', `color=c=0x0d0d2b:s=1080x1920:r=30,format=yuv420p`,
+      '-i', `color=c=0x0d0a2b:s=1080x1920:r=30,format=yuv420p`,
       '-t', String(durationSeconds),
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
       outputPath,
     ]
     await spawnAsync('ffmpeg', fallbackArgs)
