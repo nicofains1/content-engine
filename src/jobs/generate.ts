@@ -13,7 +13,7 @@ import { generateContent } from '../services/content.js'
 import { generateTTS } from '../services/tts.js'
 import { generateVideo, pickMusicTrack } from '../services/video.js'
 import { getOrFetchBackground, getOrFetchMusic } from '../services/asset-manager.js'
-import { selectCM, createInitialPopulation } from '../darwin/population.js'
+import { selectCM, createInitialPopulation, runPopulationEvaluation } from '../darwin/population.js'
 import type { CM } from '../types/index.js'
 import { nanoid } from 'nanoid'
 
@@ -163,6 +163,16 @@ async function main(): Promise<void> {
     }
 
     logger.info({ generated, videosPerRun }, 'Generate job complete')
+
+    // Run Darwin evaluation after every generate cycle
+    if (generated > 0) {
+      try {
+        const evalResult = runPopulationEvaluation(db, logger)
+        logger.info({ killed: evalResult.killed, reproduced: evalResult.reproduced }, 'Darwin evaluation complete')
+      } catch (err) {
+        logger.error({ err }, 'Darwin evaluation failed (non-fatal)')
+      }
+    }
   } finally {
     releaseLock(JOB_NAME)
   }
