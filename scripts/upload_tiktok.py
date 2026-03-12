@@ -182,6 +182,42 @@ def upload(video_path: str, description: str, cookies_path: str) -> None:
         dismiss_modal_if_present(page)
         wait_for_overlay_gone(page, timeout_ms=5_000)
 
+        # Step 3b: Enable AI-generated content label
+        log('Setting AI content disclosure label')
+        try:
+            # TikTok's AI content toggle — look for the label/checkbox
+            ai_selectors = [
+                '[data-e2e="ai-generated-content-toggle"]',
+                'input[type="checkbox"][aria-label*="AI"]',
+                'button:has-text("AI-generated content")',
+                '[class*="ai-content"] input',
+                '[class*="AIContent"] button',
+            ]
+            toggled = False
+            for sel in ai_selectors:
+                try:
+                    el = page.locator(sel).first
+                    if el.is_visible(timeout=2000):
+                        # Only click if not already checked
+                        tag = el.evaluate('e => e.tagName.toLowerCase()')
+                        if tag == 'input':
+                            if not el.is_checked():
+                                el.click()
+                        else:
+                            el.click()
+                        log('AI label toggled', sel)
+                        page.wait_for_timeout(500)
+                        toggled = True
+                        break
+                except Exception:
+                    pass
+            if not toggled:
+                log('AI label toggle not found, skipping')
+        except Exception as e:
+            log('AI label step failed (non-fatal)', str(e)[:60])
+
+        dismiss_modal_if_present(page)
+
         # Step 4: Wait for video to finish server-side processing
         log('Waiting for video processing to complete')
         try:

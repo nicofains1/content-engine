@@ -54,6 +54,8 @@ async function main(): Promise<void> {
         posted_at: new Date().toISOString(),
       })
       youtubeUrl = result.url
+      // Increment videos_generated immediately so Darwin has current data
+      db.prepare('UPDATE cms SET videos_generated = videos_generated + 1 WHERE id = ?').run(cmId)
       logger.info({ contentId, url: result.url }, 'YouTube upload complete')
     } catch (err) {
       logger.error({ err, contentId }, 'YouTube upload failed')
