@@ -61,7 +61,8 @@ def setup_profile(cookies_path: str, bio: Optional[str], username: Optional[str]
     updated: List[str] = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        # headless=False: avoids TikTok bot detection; works on macOS even via SSH
+        browser = p.chromium.launch(headless=False)
         context = browser.new_context(
             user_agent=(
                 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
@@ -101,16 +102,25 @@ def setup_profile(cookies_path: str, bio: Optional[str], username: Optional[str]
         page.wait_for_timeout(5_000)
         log('Profile page loaded', page.url[:60])
 
-        # Click "Edit profile" button
+        # Click "Edit profile" button — TikTok shows this on your own profile page
         try:
-            edit_btn = page.get_by_role('button', name='Edit profile')
-            if edit_btn.count() == 0:
-                edit_btn = page.locator('button:has-text("Edit profile")')
-            edit_btn.first.click(timeout=5_000)
+            edit_btn = page.locator('button:has-text("Edit profile")').first
+            edit_btn.wait_for(state='visible', timeout=10_000)
+            edit_btn.click()
             page.wait_for_timeout(3_000)
             log('Clicked Edit profile', page.url[:60])
         except Exception as e:
-            log('Could not click Edit profile button', str(e)[:60])
+            # Fallback: JS click
+            try:
+                page.evaluate("""
+                    const btns = [...document.querySelectorAll('button')];
+                    const edit = btns.find(b => b.textContent.trim() === 'Edit profile');
+                    if (edit) edit.click();
+                """)
+                page.wait_for_timeout(3_000)
+                log('Clicked Edit profile via JS fallback')
+            except Exception as e2:
+                log('Could not click Edit profile button', str(e2)[:60])
 
         # Set bio
         if bio:
