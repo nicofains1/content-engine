@@ -32,6 +32,45 @@ export async function invokeClaude(prompt: string, timeoutMs = 120_000): Promise
   })
 }
 
+export async function invokeClaudeText(
+  prompt: string,
+  model = 'claude-sonnet-4-6',
+  timeoutMs = 60_000,
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY is required for Claude API calls')
+  }
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+
+  if (!resp.ok) {
+    const body = await resp.text()
+    throw new Error(`Anthropic API error ${resp.status}: ${body.slice(0, 300)}`)
+  }
+
+  const json = (await resp.json()) as { content: Array<{ type: string; text?: string }> }
+  const text = json.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+  if (!text.trim()) throw new Error('Claude returned empty response')
+  return text.trim()
+}
+
 export async function invokeClaudeVision(
   prompt: string,
   imagePaths: string[],

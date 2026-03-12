@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3'
 import type { CM, Genome } from '../types/index.js'
 import type { Logger } from 'pino'
 import { insertCM, getAllActiveCMs } from '../db/index.js'
+import { generateCMPlan } from '../services/plan.js'
 
 const GENOME_FIELDS: (keyof Genome)[] = [
   'hookStyle',
@@ -147,6 +148,7 @@ export function parseCM(row: Record<string, unknown>): CM {
     generation: row['generation'] as number,
     parent_id: row['parent_id'] as string | undefined,
     genome: typeof row['genome'] === 'string' ? JSON.parse(row['genome']) : row['genome'] as Genome,
+    plan: row['plan'] as string | undefined,
     status: row['status'] as CM['status'],
     videos_generated: row['videos_generated'] as number,
     total_views: row['total_views'] as number,
@@ -237,7 +239,7 @@ export interface PopulationEvalResult {
   population: CM[]
 }
 
-export function runPopulationEvaluation(
+export async function runPopulationEvaluation(
   db: Database.Database,
   logger: Logger,
   opts: {
@@ -247,7 +249,7 @@ export function runPopulationEvaluation(
     killThreshold?: number
     reproduceThreshold?: number
   } = {}
-): PopulationEvalResult {
+): Promise<PopulationEvalResult> {
   const rawCMs = getAllActiveCMs(db)
   const cms: CM[] = rawCMs.map(r => parseCM(r))
 
@@ -264,12 +266,21 @@ export function runPopulationEvaluation(
   }
 
   for (const { parent, childGenome, childId } of toReproduce) {
+    let plan: string | undefined
+    try {
+      const result = await generateCMPlan(childId, childGenome)
+      if (result) plan = result
+      logger.info({ cmId: childId }, plan ? 'Plan generated for child CM' : 'Plan generation returned null for child CM')
+    } catch (err) {
+      logger.warn({ err, cmId: childId }, 'Plan generation failed for child CM (non-blocking)')
+    }
     insertCM(db, {
       id: childId,
       generation: parent.generation + 1,
       parent_id: parent.id,
       genome: JSON.stringify(childGenome),
       status: 'active',
+      plan,
     })
     reproduced.push(childId)
     logger.info({ parentId: parent.id, childId, generation: parent.generation + 1 }, 'CM reproduced')

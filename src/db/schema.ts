@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS cms (
   total_comments INTEGER NOT NULL DEFAULT 0,
   avg_views REAL NOT NULL DEFAULT 0,
   best_video_views INTEGER NOT NULL DEFAULT 0,
+  plan TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   died_at TEXT,
   death_reason TEXT
