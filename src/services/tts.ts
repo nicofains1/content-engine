@@ -56,7 +56,7 @@ export async function generateTTS(
   filename: string
 ): Promise<TTSResult> {
   const audioPath = `${outputDir}/${filename}.mp3`
-  const subtitlePath = `${outputDir}/${filename}.vtt`
+  const subtitlePath = `${outputDir}/${filename}.srt`
 
   if (edgeTtsFailCount < 3) {
     try {
