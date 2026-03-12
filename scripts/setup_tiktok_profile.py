@@ -82,12 +82,27 @@ def setup_profile(cookies_path: str, bio: Optional[str], username: Optional[str]
         page = context.new_page()
 
         log('Navigating to profile edit page')
-        page.goto('https://www.tiktok.com/profile/edit', timeout=30_000)
-        page.wait_for_load_state('domcontentloaded')
-        page.wait_for_timeout(3_000)
-
-        if 'login' in page.url or 'passport' in page.url:
-            raise RuntimeError('Not authenticated - cookies may be expired')
+        # Try multiple known TikTok profile edit URLs
+        profile_urls = [
+            'https://www.tiktok.com/setting',
+            'https://www.tiktok.com/creator-center/account-info',
+            'https://www.tiktok.com/profile/edit',
+        ]
+        found_edit_page = False
+        for url in profile_urls:
+            page.goto(url, timeout=30_000)
+            page.wait_for_load_state('domcontentloaded')
+            page.wait_for_timeout(3_000)
+            current = page.url
+            log('Tried URL', f'{url[:60]} -> {current[:60]}')
+            if 'login' in current or 'passport' in current:
+                raise RuntimeError('Not authenticated - cookies may be expired')
+            # Check if we landed on a page with editable profile fields
+            if page.locator('textarea, input[type="text"]').count() > 0:
+                found_edit_page = True
+                break
+        if not found_edit_page:
+            log('WARNING: Could not find profile edit page, proceeding anyway')
 
         log('Profile edit page loaded', page.url[:60])
 
@@ -99,6 +114,9 @@ def setup_profile(cookies_path: str, bio: Optional[str], username: Optional[str]
                     'textarea[placeholder*="bio" i]',
                     'textarea[data-e2e="bio-input"]',
                     '[data-e2e="profile-bio"] textarea',
+                    'textarea[placeholder*="introduce" i]',
+                    'textarea[placeholder*="yourself" i]',
+                    'textarea[maxlength]',
                     'textarea',
                 ]
                 for sel in bio_selectors:
