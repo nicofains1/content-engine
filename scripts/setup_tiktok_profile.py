@@ -84,21 +84,21 @@ def setup_profile(cookies_path: str, bio: Optional[str], username: Optional[str]
         log('Navigating to own profile page')
         # TikTok's "Edit profile" button lives on the user's own profile page
         page.goto('https://www.tiktok.com/tiktokstudio', timeout=30_000)
-        page.wait_for_load_state('networkidle', timeout=15_000)
-        page.wait_for_timeout(2_000)
+        page.wait_for_load_state('domcontentloaded')
+        page.wait_for_timeout(5_000)
 
         if 'login' in page.url or 'passport' in page.url:
             raise RuntimeError('Not authenticated - cookies may be expired')
 
-        # Extract username from the page body
+        # Extract username from the page body (first line is the username in TikTok Studio)
         body_text = page.inner_text('body')
         username = body_text.split('\n')[0].strip() if body_text else 'unknown'
         log('Detected username', username)
 
         # Navigate to own profile page
         page.goto(f'https://www.tiktok.com/@{username}', timeout=30_000)
-        page.wait_for_load_state('networkidle', timeout=15_000)
-        page.wait_for_timeout(3_000)
+        page.wait_for_load_state('domcontentloaded')
+        page.wait_for_timeout(5_000)
         log('Profile page loaded', page.url[:60])
 
         # Click "Edit profile" button
