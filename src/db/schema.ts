@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS content (
   video_path TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   error TEXT,
+  eval_score INTEGER,
+  eval_pass INTEGER,
+  eval_reason TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`
