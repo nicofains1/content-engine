@@ -85,10 +85,11 @@ Frames extracted at seconds 2, 5, 10 (attached).
 SRT subtitle content:
 ${subtitleText.slice(0, 500)}
 
-Evaluate against EACH acceptance criterion in the plan.
+Evaluate TWO hard technical criteria plus overall quality.
 Respond ONLY with valid JSON (no markdown, no code fences):
 {
-  "pass": true/false,
+  "subtitles_visible": true/false,
+  "background_is_real_video": true/false,
   "score": 0-100,
   "criteriaResults": [
     { "criterion": "...", "pass": true, "note": "..." }
@@ -97,9 +98,10 @@ Respond ONLY with valid JSON (no markdown, no code fences):
 }
 
 Rules:
-- pass: true only if ALL criteria pass
-- score: 0-100 overall quality score
-- criteriaResults: one entry per acceptance criterion from the plan
+- subtitles_visible: true if ANY frame shows readable text/captions overlaid on the video
+- background_is_real_video: true if the background is real footage (not a solid/flat color)
+- score: 0-100 overall quality reflecting how well the video matches the plan (tone, style, word count, CTA, etc.)
+- criteriaResults: one entry per acceptance criterion from the plan (for logging, does NOT affect pass/fail)
 - reason: one sentence explaining the score`
 }
 
@@ -138,12 +140,21 @@ function parsePlanEvalResponse(response: string): EvalResult {
 
   try {
     const data = JSON.parse(jsonMatch[0]) as {
-      pass?: boolean
+      subtitles_visible?: boolean
+      background_is_real_video?: boolean
       score?: number
       reason?: string
       criteriaResults?: Array<{ criterion: string; pass: boolean; note: string }>
     }
 
+    // Only hard-block on two technical criteria
+    const subtitlesOk = data.subtitles_visible !== false
+    const backgroundOk = data.background_is_real_video !== false
+    const pass = subtitlesOk && backgroundOk
+
+    const score = typeof data.score === 'number' ? data.score : (pass ? 80 : 20)
+
+    // Log soft criteria results but don't block on them
     const criteriaResults = Array.isArray(data.criteriaResults)
       ? data.criteriaResults.map(cr => ({
           criterion: cr.criterion ?? '',
@@ -152,19 +163,12 @@ function parsePlanEvalResponse(response: string): EvalResult {
         }))
       : undefined
 
-    const allCriteriaPassed = criteriaResults
-      ? criteriaResults.every(cr => cr.pass)
-      : data.pass !== false
+    let reason = data.reason ?? ''
+    if (!subtitlesOk) reason = 'no subtitles detected'
+    if (!backgroundOk) reason = 'solid color background'
+    if (!subtitlesOk && !backgroundOk) reason = 'no subtitles detected, solid color background'
 
-    const pass = data.pass !== false && allCriteriaPassed
-    const score = typeof data.score === 'number' ? data.score : (pass ? 80 : 20)
-
-    return {
-      score,
-      pass,
-      reason: data.reason ?? '',
-      criteriaResults,
-    }
+    return { score, pass, reason, criteriaResults }
   } catch {
     return { score: 50, pass: true, reason: 'JSON parse error in eval response, defaulting to pass' }
   }
