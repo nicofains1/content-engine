@@ -20,6 +20,7 @@ import json
 import time
 import http.cookiejar
 from pathlib import Path
+from typing import Optional, List
 
 
 def log(step: str, detail: str = '') -> None:
@@ -30,7 +31,7 @@ def log(step: str, detail: str = '') -> None:
     print(msg, file=sys.stderr)
 
 
-def load_netscape_cookies(cookies_path: str) -> list[dict]:
+def load_netscape_cookies(cookies_path: str) -> List[dict]:
     jar = http.cookiejar.MozillaCookieJar()
     jar.load(cookies_path, ignore_discard=True, ignore_expires=True)
     cookies = []
@@ -50,14 +51,14 @@ def load_netscape_cookies(cookies_path: str) -> list[dict]:
     return cookies
 
 
-def setup_profile(cookies_path: str, bio: str | None, username: str | None, avatar: str | None) -> list[str]:
+def setup_profile(cookies_path: str, bio: Optional[str], username: Optional[str], avatar: Optional[str]) -> List[str]:
     try:
         from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
     except ImportError:
         raise RuntimeError('playwright not installed. Run: pip3 install playwright && playwright install chromium')
 
     cookies = load_netscape_cookies(cookies_path)
-    updated: list[str] = []
+    updated: List[str] = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
