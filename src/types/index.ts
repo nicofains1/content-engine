@@ -91,6 +91,7 @@ export interface CM {
   generation: number
   parent_id?: string
   genome: Genome
+  plan?: string
   status: CMStatus
   videos_generated: number
   total_views: number

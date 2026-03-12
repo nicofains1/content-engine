@@ -24,5 +24,10 @@ export function runMigrations(db: Database.Database): void {
       db.prepare('ALTER TABLE content ADD COLUMN eval_pass INTEGER').run()
       db.prepare('ALTER TABLE content ADD COLUMN eval_reason TEXT').run()
     }
+
+    // v3: add plan column to cms table
+    if (!columnExists(db, 'cms', 'plan')) {
+      db.prepare('ALTER TABLE cms ADD COLUMN plan TEXT').run()
+    }
   })()
 }

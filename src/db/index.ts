@@ -321,10 +321,14 @@ export function getWeeklyMetrics(db: Database.Database): {
 }
 
 export function insertCM(db: Database.Database, cm: {
-  id: string; generation: number; parent_id?: string; genome: string; status: string
+  id: string; generation: number; parent_id?: string; genome: string; status: string; plan?: string
 }): void {
   db.prepare(`
-    INSERT INTO cms (id, generation, parent_id, genome, status)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(cm.id, cm.generation, cm.parent_id ?? null, cm.genome, cm.status)
+    INSERT INTO cms (id, generation, parent_id, genome, status, plan)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(cm.id, cm.generation, cm.parent_id ?? null, cm.genome, cm.status, cm.plan ?? null)
+}
+
+export function updateCMPlan(db: Database.Database, cmId: string, plan: string): void {
+  db.prepare('UPDATE cms SET plan = ? WHERE id = ?').run(plan, cmId)
 }

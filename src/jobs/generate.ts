@@ -7,6 +7,7 @@ import { loadConfig } from '../config/index.js'
 import {
   getDb, getAllActiveCMs, insertCM, insertRedditPost,
   isRedditPostProcessed, markRedditPostUsed, insertContent, updateContentStatus,
+  updateCMPlan,
 } from '../db/index.js'
 import { fetchTopPosts } from '../services/reddit.js'
 import { generateContent } from '../services/content.js'
@@ -15,6 +16,7 @@ import { generateVideo, pickMusicTrack } from '../services/video.js'
 import { getOrFetchBackground, getOrFetchMusic } from '../services/asset-manager.js'
 import { selectCM, createInitialPopulation, runPopulationEvaluation } from '../darwin/population.js'
 import { evaluateVideo } from '../services/eval.js'
+import { generateCMPlan } from '../services/plan.js'
 import type { CM } from '../types/index.js'
 import { nanoid } from 'nanoid'
 
@@ -38,7 +40,15 @@ async function main(): Promise<void> {
       logger.info('No CMs found, creating initial population')
       const initial = createInitialPopulation(3, config.voices)
       for (const { id, generation, genome } of initial) {
-        insertCM(db, { id, generation, genome: JSON.stringify(genome), status: 'active' })
+        let plan: string | undefined
+        try {
+          const result = await generateCMPlan(id, genome)
+          if (result) plan = result
+          logger.info({ cmId: id }, plan ? 'Plan generated for new CM' : 'Plan generation returned null for new CM')
+        } catch (err) {
+          logger.warn({ err, cmId: id }, 'Plan generation failed for new CM (non-blocking)')
+        }
+        insertCM(db, { id, generation, genome: JSON.stringify(genome), status: 'active', plan })
       }
       rawCMs = getAllActiveCMs(db)
     }
@@ -47,6 +57,24 @@ async function main(): Promise<void> {
       ...(r as any),
       genome: typeof r['genome'] === 'string' ? JSON.parse(r['genome'] as string) : r['genome'],
     }))
+
+    // Backfill: generate plans for existing CMs that don't have one
+    for (const cm of cms) {
+      if (!cm.plan) {
+        try {
+          const plan = await generateCMPlan(cm.id, cm.genome)
+          if (plan) {
+            updateCMPlan(db, cm.id, plan)
+            cm.plan = plan
+            logger.info({ cmId: cm.id }, 'Backfilled plan for existing CM')
+          } else {
+            logger.warn({ cmId: cm.id }, 'Plan backfill returned null (will use generic eval)')
+          }
+        } catch (err) {
+          logger.warn({ err, cmId: cm.id }, 'Plan backfill failed (non-blocking, will use generic eval)')
+        }
+      }
+    }
 
     const videosPerRun = config.content.videosPerRun ?? 1
     let generated = 0
@@ -154,6 +182,7 @@ async function main(): Promise<void> {
             ttsResult.subtitlePath ?? '',
             cm.genome,
             contentId,
+            cm.plan ?? undefined,
           )
           // Save eval result to DB
           db.prepare(
@@ -201,7 +230,7 @@ async function main(): Promise<void> {
     // Run Darwin evaluation after every generate cycle
     if (generated > 0) {
       try {
-        const evalResult = runPopulationEvaluation(db, logger)
+        const evalResult = await runPopulationEvaluation(db, logger)
         logger.info({ killed: evalResult.killed, reproduced: evalResult.reproduced }, 'Darwin evaluation complete')
       } catch (err) {
         logger.error({ err }, 'Darwin evaluation failed (non-fatal)')
