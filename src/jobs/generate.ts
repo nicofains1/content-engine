@@ -14,6 +14,7 @@ import { generateTTS } from '../services/tts.js'
 import { generateVideo, pickMusicTrack } from '../services/video.js'
 import { getOrFetchBackground, getOrFetchMusic } from '../services/asset-manager.js'
 import { selectCM, createInitialPopulation, runPopulationEvaluation } from '../darwin/population.js'
+import { evaluateVideo } from '../services/eval.js'
 import type { CM } from '../types/index.js'
 import { nanoid } from 'nanoid'
 
@@ -143,6 +144,39 @@ async function main(): Promise<void> {
           subtitlePosition: cm.genome.subtitlePosition,
           musicVolume: cm.genome.musicVolume,
         })
+
+        // 4. Self-evaluation: visual QA before posting
+        logger.info({ contentId }, 'Running self-evaluation')
+        let evalPassed = true
+        try {
+          const evalResult = await evaluateVideo(
+            outputPath,
+            ttsResult.subtitlePath ?? '',
+            cm.genome,
+            contentId,
+          )
+          // Save eval result to DB
+          db.prepare(
+            `UPDATE content SET eval_score = ?, eval_pass = ?, eval_reason = ? WHERE id = ?`
+          ).run(evalResult.score, evalResult.pass ? 1 : 0, evalResult.reason, contentId)
+
+          if (!evalResult.pass) {
+            evalPassed = false
+            logger.warn({ contentId, reason: evalResult.reason, score: evalResult.score },
+              `[eval] FAIL: ${evalResult.reason}`)
+            updateContentStatus(db, contentId, 'failed', {
+              error: `eval failed: ${evalResult.reason}`,
+            })
+          } else {
+            logger.info({ contentId, score: evalResult.score, reason: evalResult.reason },
+              '[eval] PASS')
+          }
+        } catch (evalErr) {
+          // Eval failure is non-blocking — log and continue
+          logger.warn({ err: evalErr, contentId }, '[eval] Eval error (non-blocking, treating as pass)')
+        }
+
+        if (!evalPassed) continue
 
         updateContentStatus(db, contentId, 'ready', {
           video_path: outputPath,
