@@ -70,11 +70,14 @@ function hexToAssColor(hex: string): string {
 }
 
 function getSubtitleForceStyle(opts: VideoOptions): string {
-  const size = opts.subtitleStyle === 'karaoke_grande' ? 24 : opts.subtitleStyle === 'karaoke_chico' ? 18 : 20
+  // FontSize is in pixels on the rendered video (1080x1920). 20px was invisible; 60-72px is readable.
+  const size = opts.subtitleStyle === 'karaoke_grande' ? 72 : opts.subtitleStyle === 'karaoke_chico' ? 56 : 64
   const color = hexToAssColor(opts.subtitleColor)
   const marginV = opts.subtitlePosition === 'abajo' ? 100 : opts.subtitlePosition === 'arriba' ? 800 : 500
-  // Arial is always available on macOS; Bold=1, shadow for readability
-  return `FontName=Arial,Bold=1,FontSize=${size},PrimaryColour=${color},OutlineColour=&H00000000,ShadowColour=&H80000000,Outline=3,Shadow=1,BorderStyle=1,Alignment=2,MarginV=${marginV}`
+  // PlayResX/PlayResY must match video resolution so FontSize/MarginV are in actual pixels.
+  // Without this, libass uses PlayResY=288 default and scales all values by 1920/288 ≈ 6.7x,
+  // pushing MarginV=500 to 3333px (off-screen) and making FontSize wildly oversized.
+  return `PlayResX=1080,PlayResY=1920,FontName=Arial,Bold=1,FontSize=${size},PrimaryColour=${color},OutlineColour=&H00000000,ShadowColour=&H80000000,Outline=3,Shadow=1,BorderStyle=1,Alignment=2,MarginV=${marginV}`
 }
 
 export async function generateVideo(opts: VideoOptions): Promise<string> {

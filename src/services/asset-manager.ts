@@ -74,16 +74,16 @@ export async function generateAbstractBackground(outputPath: string, durationSec
   const dir = outputPath.split('/').slice(0, -1).join('/')
   if (dir) mkdirSync(dir, { recursive: true })
 
-  // Animated cosmic gradient: deep blues/purples with light wave shimmer
-  // Each channel uses multiple sine waves at different frequencies and speeds
-  const geqR = `clip(sin((X+Y)/90+t*1.2)*25+sin(X/130-t*1.8)*18+8,0,255)`
-  const geqG = `clip(sin((X+Y)/110+t*0.8)*12+sin(Y/100+t*1.5)*20+12,0,255)`
-  const geqB = `clip(sin(Y/70-t*2.5)*90+sin(X/80+t*1.8)*55+70,0,255)`
+  // Animated gradient with visible color movement (purple/blue/teal waves)
+  // Note: FFmpeg geq uses uppercase T for time (seconds), not lowercase t
+  const geqR = `clip(sin((X+Y)/80+T*1.5)*60+sin(X/100-T*2.0)*40+80,0,255)`
+  const geqG = `clip(sin((X-Y)/90+T*1.2)*50+sin(Y/70+T*1.8)*45+40,0,255)`
+  const geqB = `clip(sin(Y/60-T*2.5)*80+sin(X/70+T*2.0)*60+120,0,255)`
 
   const args = [
     '-y',
     '-f', 'lavfi',
-    '-i', `color=c=0x08082a:s=1080x1920:r=30,geq=r='${geqR}':g='${geqG}':b='${geqB}',format=yuv420p`,
+    '-i', `color=c=0x201040:s=1080x1920:r=30,geq=r='${geqR}':g='${geqG}':b='${geqB}',format=yuv420p`,
     '-t', String(durationSeconds),
     '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
     outputPath,
@@ -122,12 +122,14 @@ export async function getOrFetchBackground(query: string, config: Config): Promi
     }
   }
 
-  // Try any local file first
+  // Try any local file first, preferring real videos over generated ones
   try {
     const files = readdirSync(bgDir).filter(f => /\.(mp4|mov|mkv)$/i.test(f))
-    if (files.length > 0) {
-      const idx = Math.floor(Math.random() * files.length)
-      return join(bgDir, files[idx]!)
+    const realFiles = files.filter(f => !f.startsWith('generated_'))
+    const candidates = realFiles.length > 0 ? realFiles : files
+    if (candidates.length > 0) {
+      const idx = Math.floor(Math.random() * candidates.length)
+      return join(bgDir, candidates[idx]!)
     }
   } catch {
     // ignore
