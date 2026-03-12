@@ -185,36 +185,46 @@ def upload(video_path: str, description: str, cookies_path: str) -> None:
         # Step 3b: Enable AI-generated content label
         log('Setting AI content disclosure label')
         try:
-            # TikTok's AI content toggle — look for the label/checkbox
+            # TikTok's AI content toggle — multiple selector strategies
             ai_selectors = [
+                # data-e2e attribute (preferred)
+                '[data-e2e="ai_label-switch"]',
                 '[data-e2e="ai-generated-content-toggle"]',
-                'input[type="checkbox"][aria-label*="AI"]',
+                # role=switch near "AI" text
+                'div:has-text("AI-generated content") >> div[role="switch"]',
+                # TUX switch component near AI label text
+                'div:has-text("AI-generated") >> [class*="TUXSwitch"]',
+                'div:has-text("AI-generated") >> [class*="switch"]',
+                # Generic toggle near AI text
+                'label:has-text("AI-generated") >> input[type="checkbox"]',
                 'button:has-text("AI-generated content")',
-                '[class*="ai-content"] input',
-                '[class*="AIContent"] button',
             ]
             toggled = False
             for sel in ai_selectors:
                 try:
                     el = page.locator(sel).first
                     if el.is_visible(timeout=2000):
-                        # Only click if not already checked
                         tag = el.evaluate('e => e.tagName.toLowerCase()')
-                        if tag == 'input':
+                        role = el.evaluate('e => e.getAttribute("role") || ""')
+                        if tag == 'input' and el.get_attribute('type') == 'checkbox':
                             if not el.is_checked():
+                                el.click()
+                        elif role == 'switch':
+                            aria_checked = el.evaluate('e => e.getAttribute("aria-checked")')
+                            if aria_checked != 'true':
                                 el.click()
                         else:
                             el.click()
-                        log('AI label toggled', sel)
+                        log('AI label toggled ON', sel)
                         page.wait_for_timeout(500)
                         toggled = True
                         break
                 except Exception:
                     pass
             if not toggled:
-                log('AI label toggle not found, skipping')
+                log('WARNING: AI content label toggle NOT FOUND — video may be suppressed by TikTok')
         except Exception as e:
-            log('AI label step failed (non-fatal)', str(e)[:60])
+            log('WARNING: AI label step FAILED — video may be suppressed', str(e)[:120])
 
         dismiss_modal_if_present(page)
 

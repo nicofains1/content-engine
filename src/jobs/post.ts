@@ -72,6 +72,7 @@ async function main(): Promise<void> {
         videoPath,
         description: `${caption} ${hashtags}`,
         cookiesPath: config.tiktok.cookiesPath,
+        contentId,
       })
       updatePost(db, ttPostId, 'posted', {
         posted_at: new Date().toISOString(),

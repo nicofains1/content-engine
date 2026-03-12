@@ -15,6 +15,7 @@ describe('TikTok service', () => {
       videoPath: '/tmp/video.mp4',
       description: 'test',
       cookiesPath: '/tmp/cookies.txt',
+      contentId: 'test-123',
     })).resolves.toBeUndefined()
   })
 })
