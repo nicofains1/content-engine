@@ -114,6 +114,14 @@ CREATE TABLE IF NOT EXISTS prompt_history (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`
 
+export const CREATE_RESEARCH_RUNS = `
+CREATE TABLE IF NOT EXISTS research_runs (
+  id TEXT PRIMARY KEY,
+  ran_at TEXT NOT NULL DEFAULT (datetime('now')),
+  findings TEXT NOT NULL,
+  genome_recommendations TEXT
+)`
+
 export const ALL_TABLES = [
   CREATE_CMS, // CMS first (content references it)
   CREATE_REDDIT_POSTS,
@@ -123,6 +131,7 @@ export const ALL_TABLES = [
   CREATE_LEARNINGS,
   CREATE_EXPERIMENTS,
   CREATE_PROMPT_HISTORY,
+  CREATE_RESEARCH_RUNS,
 ]
 
 export const ALL_INDEXES = [
