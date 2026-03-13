@@ -33,3 +33,16 @@ Maximize views and engagement on TikTok + YouTube Shorts with 100% automated con
 
 ## Pivot History
 <!-- GOD appends each strategic decision here -->
+
+## v2 Species Launch (2026-03-13)
+
+Killed 3 gen-1 CMs (god_v2_reset). Launched 4 distinct species optimized for Spanish-language short content:
+
+| ID | Species | Hook | Voice | Target Secs | Subreddits |
+|----|---------|------|-------|-------------|------------|
+| cm-godv2-1 | El Gancho Imposible | dato_impactante | es-MX-DaliaNeural | 25-50 | TIL, Damnthatsinteresting |
+| cm-godv2-2 | Historia Real | pregunta | es-AR-ElenaNeural | 55-90 | TIFU, AITA, offmychest |
+| cm-godv2-3 | Predicción 2030 | numero | es-ES-AlvaroNeural | 40-65 | Futurology, technology |
+| cm-godv2-4 | Dato Viral | negacion | es-MX-JorgeNeural | 35-55 | Showerthoughts, LPT, ELI5 |
+
+**Rationale:** Maximize diversity across 4 axes — hook type, voice/accent, content source, and visual style. Each species targets a different emotional response (surprise, empathy, unease, fun) and audience segment. High minRedditScore filters ensure only proven content gets adapted.
