@@ -1,5 +1,5 @@
 // GOD layer - strategic orchestrator for radical population management
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, readdirSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { getDb, getAllActiveCMs, insertCM } from '../db/index.js'
 import { invokeClaude } from '../lib/claude.js'
@@ -160,6 +160,45 @@ async function executeDecision(
   }
 }
 
+function analyzeTiktokUploadLogs(): string {
+  const logsDir = join(process.cwd(), 'logs')
+  if (!existsSync(logsDir)) return ''
+
+  const logFiles = readdirSync(logsDir)
+    .filter(f => f.startsWith('tiktok-upload-') && f.endsWith('.log'))
+    .sort()
+    .slice(-10) // last 10 logs
+
+  if (logFiles.length === 0) return ''
+
+  const warningCounts: Record<string, number> = {}
+  for (const file of logFiles) {
+    const content = readFileSync(join(logsDir, file), 'utf-8')
+    const warnings = content.match(/WARNING: .+/g) || []
+    for (const w of warnings) {
+      const msg = w.replace(/WARNING: /, '').replace(/:.+$/, '').trim()
+      warningCounts[msg] = (warningCounts[msg] || 0) + 1
+    }
+  }
+
+  const total = logFiles.length
+  const threshold = total * 0.5
+  const critical = Object.entries(warningCounts)
+    .filter(([, count]) => count > threshold)
+    .map(([msg, count]) => `  - "${msg}" in ${count}/${total} uploads`)
+
+  if (critical.length === 0) return ''
+
+  const report = [
+    `ALERTA OPERACIONAL — TikTok Upload:`,
+    `Analizados ${total} logs recientes. Warnings criticos (>50% de uploads):`,
+    ...critical,
+  ].join('\n')
+
+  logger.warn({ warningCounts, total }, 'TikTok upload log warnings detected')
+  return report
+}
+
 export async function runGod(): Promise<void> {
   const config = loadConfig()
   const db = getDb()
@@ -167,6 +206,12 @@ export async function runGod(): Promise<void> {
   const rawCMs = getAllActiveCMs(db)
   const cms = rawCMs.map(r => parseCM(r as Record<string, unknown>))
   const metrics = get14DayMetrics(db)
+
+  // Step 0: Analyze TikTok upload logs for operational issues
+  const uploadLogReport = analyzeTiktokUploadLogs()
+  if (uploadLogReport) {
+    logger.warn('Operational issue detected in TikTok uploads')
+  }
 
   const godMd = existsSync(GOD_MD_PATH) ? readFileSync(GOD_MD_PATH, 'utf-8') : ''
 
@@ -185,7 +230,7 @@ ESTADO ACTUAL DEL SISTEMA:
 
 POBLACION ACTUAL:
 ${cmSummary || 'Sin CMs activos'}
-
+${uploadLogReport ? `\n${uploadLogReport}\n` : ''}
 CONTEXTO HISTORICO (GOD.md):
 ${godMd.slice(-2000)}
 
@@ -227,7 +272,8 @@ DETAILS: [JSON con parametros extra, o {} si no aplica]
 
   // Update GOD.md with historial entry
   const timestamp = new Date().toISOString()
-  const historyEntry = `\n### ${timestamp}\n**Action:** ${decision.action}\n**Reason:** ${decision.reason}\n\n${godLog}\n`
+  const opsAlert = uploadLogReport ? `\n**Ops Alert:**\n${uploadLogReport}\n` : ''
+  const historyEntry = `\n### ${timestamp}\n**Action:** ${decision.action}\n**Reason:** ${decision.reason}\n${opsAlert}\n${godLog}\n`
   const updatedGodMd = godMd + historyEntry
   writeFileSync(GOD_MD_PATH, updatedGodMd)
 
