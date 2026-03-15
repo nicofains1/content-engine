@@ -54,26 +54,32 @@ def load_netscape_cookies(cookies_path: str) -> list[dict]:
 
 
 def dismiss_modal_if_present(page) -> None:
-    """Dismiss TikTok copyright/interactivity modals that block the upload flow."""
-    # Common modal dismiss selectors: Confirm, OK, Got it, Close
+    """Dismiss TikTok copyright/interactivity/notification modals that block the upload flow.
+    Loops until no more modals are found so stacked dialogs are all cleared.
+    """
     dismiss_selectors = [
+        'button:has-text("Got it")',
         'button:has-text("Confirm")',
         'button:has-text("OK")',
-        'button:has-text("Got it")',
         'button:has-text("I understand")',
+        'button:has-text("Cancel")',          # "Turn on notifications" modal — decline
         'button[aria-label="Close"]',
         '[data-e2e="modal-close-inner-button"]',
     ]
-    for sel in dismiss_selectors:
-        try:
-            btn = page.locator(sel).first
-            if btn.is_visible(timeout=1000):
-                log('Modal dismissed', sel)
-                btn.click()
-                page.wait_for_timeout(500)
-                return
-        except Exception:
-            pass
+    dismissed_any = True
+    while dismissed_any:
+        dismissed_any = False
+        for sel in dismiss_selectors:
+            try:
+                btn = page.locator(sel).first
+                if btn.is_visible(timeout=800):
+                    log('Modal dismissed', sel)
+                    btn.click()
+                    page.wait_for_timeout(500)
+                    dismissed_any = True
+                    break  # restart loop to catch stacked modals
+            except Exception:
+                pass
 
 
 def wait_for_overlay_gone(page, timeout_ms: int = 15_000) -> None:
@@ -148,10 +154,10 @@ def upload(video_path: str, description: str, cookies_path: str) -> None:
         file_input.set_input_files(video_path)
         log('File set, waiting for processing')
 
-        # Wait for upload progress to start (video thumbnail or progress bar)
+        # Wait for upload progress to start
         try:
             page.wait_for_selector(
-                '[class*="upload-progress"], [class*="video-info"], video, [data-e2e="upload-video"]',
+                '[data-e2e="upload_status_container"], [class*="upload-progress"], video',
                 timeout=30_000,
             )
             log('Video processing started')
@@ -165,14 +171,18 @@ def upload(video_path: str, description: str, cookies_path: str) -> None:
 
         # Step 3: Set description/caption
         log('Setting description')
-        caption_sel = 'div[contenteditable="true"]'
+        caption_sel = '[data-e2e="caption_container"] div[contenteditable="true"]'
+        caption_sel_fallback = 'div[contenteditable="true"]'
         try:
             caption = page.locator(caption_sel).first
+            if not caption.is_visible(timeout=5_000):
+                caption = page.locator(caption_sel_fallback).first
             caption.wait_for(state='visible', timeout=30_000)
             # Clear existing content and type
             caption.click()
-            page.keyboard.press('Control+A')
-            page.keyboard.press('Delete')
+            page.keyboard.press('Meta+A')
+            page.keyboard.press('Backspace')
+            page.wait_for_timeout(300)
             page.keyboard.type(description, delay=30)
             log('Description set', f'{len(description)} chars')
         except PlaywrightTimeout:
@@ -183,44 +193,56 @@ def upload(video_path: str, description: str, cookies_path: str) -> None:
         wait_for_overlay_gone(page, timeout_ms=5_000)
 
         # Step 3b: Enable AI-generated content label
+        # The AI label section is hidden behind "Show more" in advanced settings
         log('Setting AI content disclosure label')
         try:
-            # TikTok's AI content toggle — multiple selector strategies
-            ai_selectors = [
-                # data-e2e attribute (preferred)
-                '[data-e2e="ai_label-switch"]',
-                '[data-e2e="ai-generated-content-toggle"]',
-                # role=switch near "AI" text
-                'div:has-text("AI-generated content") >> div[role="switch"]',
-                # TUX switch component near AI label text
-                'div:has-text("AI-generated") >> [class*="TUXSwitch"]',
-                'div:has-text("AI-generated") >> [class*="switch"]',
-                # Generic toggle near AI text
-                'label:has-text("AI-generated") >> input[type="checkbox"]',
-                'button:has-text("AI-generated content")',
-            ]
+            # First, expand advanced settings to reveal the AI label section
+            show_more = page.locator('[data-e2e="advanced_settings_container"]')
+            try:
+                if show_more.is_visible(timeout=3_000):
+                    show_more.click()
+                    log('Expanded advanced settings')
+                    page.wait_for_timeout(1_000)
+            except Exception:
+                pass
+
+            # Target the AI-generated content container specifically
+            aigc = page.locator('[data-e2e="aigc_container"]')
             toggled = False
-            for sel in ai_selectors:
-                try:
-                    el = page.locator(sel).first
-                    if el.is_visible(timeout=2000):
-                        tag = el.evaluate('e => e.tagName.toLowerCase()')
-                        role = el.evaluate('e => e.getAttribute("role") || ""')
-                        if tag == 'input' and el.get_attribute('type') == 'checkbox':
-                            if not el.is_checked():
-                                el.click()
-                        elif role == 'switch':
-                            aria_checked = el.evaluate('e => e.getAttribute("aria-checked")')
-                            if aria_checked != 'true':
-                                el.click()
+            try:
+                if aigc.is_visible(timeout=5_000):
+                    # Find the switch input inside the aigc container
+                    switch = aigc.locator('input[role="switch"]').first
+                    if switch.is_visible(timeout=2_000):
+                        is_checked = 'checked-true' in (switch.evaluate('e => e.className') or '')
+                        if not is_checked:
+                            switch.click()
+                            log('AI label toggled ON', 'aigc_container >> input[role=switch]')
                         else:
-                            el.click()
-                        log('AI label toggled ON', sel)
-                        page.wait_for_timeout(500)
+                            log('AI label already ON')
                         toggled = True
-                        break
-                except Exception:
-                    pass
+            except Exception:
+                pass
+
+            # Fallback: try broader selectors if aigc container wasn't found
+            if not toggled:
+                ai_selectors = [
+                    '[data-e2e="aigc_container"] [class*="Switch__input"]',
+                    'div:has-text("AI-generated content") >> input[role="switch"]',
+                    'div:has-text("AI-generated") >> [class*="switch"]',
+                ]
+                for sel in ai_selectors:
+                    try:
+                        el = page.locator(sel).first
+                        if el.is_visible(timeout=2000):
+                            el.click()
+                            log('AI label toggled ON', sel)
+                            page.wait_for_timeout(500)
+                            toggled = True
+                            break
+                    except Exception:
+                        pass
+
             if not toggled:
                 log('WARNING: AI content label toggle NOT FOUND — video may be suppressed by TikTok')
         except Exception as e:
@@ -230,10 +252,10 @@ def upload(video_path: str, description: str, cookies_path: str) -> None:
 
         # Step 4: Wait for video to finish server-side processing
         log('Waiting for video processing to complete')
+        post_btn_sel = 'button[data-e2e="post_video_button"]'
         try:
-            # Post button becomes enabled once processing is done
             page.wait_for_selector(
-                'button:has-text("Post"):not([disabled])',
+                f'{post_btn_sel}:not([disabled])',
                 timeout=120_000,
             )
             log('Video processing complete, Post button active')
@@ -246,15 +268,15 @@ def upload(video_path: str, description: str, cookies_path: str) -> None:
         # Step 5: Click Post
         log('Clicking Post button')
         try:
-            post_btn = page.locator('button:has-text("Post")').last
+            post_btn = page.locator(post_btn_sel)
             post_btn.click(timeout=10_000)
         except Exception as e:
-            # Fallback: find by more specific selector
+            # Fallback: find by exact text match via JS
             log('Primary post click failed, trying fallback', str(e)[:60])
             page.evaluate("""
-                const btns = [...document.querySelectorAll('button')];
-                const post = btns.find(b => b.textContent.trim() === 'Post' && !b.disabled);
-                if (post) post.click();
+                const btn = document.querySelector('[data-e2e="post_video_button"]')
+                    || [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Post' && !b.disabled);
+                if (btn) btn.click();
             """)
 
         # Step 6: Wait for confirmation of successful post
