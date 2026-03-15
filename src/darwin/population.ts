@@ -40,12 +40,12 @@ const TONE_INSTRUCTIONS = [
 ]
 const STRUCTURES = ['hook-desarrollo-cierre', '3-datos-rapidos', 'historia-corta', 'pregunta-respuesta']
 const CLOSING_STYLES = ['pregunta_comentarios', 'call_to_follow', 'dato_bonus', 'cliffhanger']
-const VOICES = ['es-MX-JorgeNeural', 'es-AR-TomasNeural', 'es-ES-AlvaroNeural', 'es-MX-DaliaNeural']
+const VOICES = ['es-MX-JorgeNeural', 'es-AR-TomasNeural', 'es-ES-AlvaroNeural', 'es-MX-DaliaNeural', 'es-AR-ElenaNeural']
 const SPEECH_RATES = ['-10%', '+0%', '+5%', '+10%', '+15%']
 const SUBTITLE_STYLES = ['bold_white', 'yellow_highlight', 'outline_black', 'gradient', 'karaoke_grande', 'karaoke_chico', 'linea_completa']
 const SUBTITLE_COLORS = ['#FFFFFF', '#FFFF00', '#00FF00', '#FF6B6B', '#FF4444']
 const SUBTITLE_POSITIONS = ['abajo', 'centro', 'arriba']
-const SUBTITLE_SIZES = [14, 16, 18, 20, 22]
+const SUBTITLE_SIZES = [48, 52, 56, 60, 64, 68, 72]
 const BACKGROUND_PREFS = ['gameplay', 'nature', 'abstract', 'cityscape', 'any']
 const BACKGROUND_QUERIES = [
   'space galaxy nebula',
@@ -58,6 +58,12 @@ const BACKGROUND_QUERIES = [
   'underwater ocean deep sea',
   'mountain landscape sunset',
   'tokyo streets night',
+  'parkour extreme sports freerunning',
+  'cinematic dark moody atmospheric',
+  'satisfying oddly satisfying hypnotic',
+  'space futuristic technology abstract',
+  'nature timelapse flowers bloom',
+  'urban street art graffiti',
 ]
 const BACKGROUND_SOURCES: Array<'pexels' | 'generated'> = ['pexels', 'pexels', 'pexels', 'generated']
 const MUSIC_GENRES: Array<string | null> = ['ambient', 'corporate', 'horror', null, null, 'ambient']
@@ -99,8 +105,12 @@ export function randomGenome(voices: string[] = VOICES): Genome {
   }
 }
 
-function mutateGenome(genome: Genome, fieldsToMutate = randomInt(1, 3)): Genome {
+function mutateGenome(genome: Genome): Genome {
+  // 20% chance: radical mutation — full genome replacement
+  if (Math.random() < 0.20) return randomGenome()
+
   const result = { ...genome, preferredSubreddits: [...genome.preferredSubreddits] }
+  const fieldsToMutate = randomInt(6, 12)
   const shuffled = [...GENOME_FIELDS].sort(() => Math.random() - 0.5)
   const fields = shuffled.slice(0, fieldsToMutate)
 
@@ -109,11 +119,11 @@ function mutateGenome(genome: Genome, fieldsToMutate = randomInt(1, 3)): Genome 
       case 'hookStyle': result.hookStyle = randomFrom(HOOK_STYLES); break
       case 'toneInstructions': result.toneInstructions = randomFrom(TONE_INSTRUCTIONS); break
       case 'scriptStructure': result.scriptStructure = randomFrom(STRUCTURES); break
-      case 'wordCountTarget': result.wordCountTarget = randomInt(80, 150); break
+      case 'wordCountTarget': result.wordCountTarget = randomInt(60, 200); break
       case 'closingStyle': result.closingStyle = randomFrom(CLOSING_STYLES); break
       case 'voice': result.voice = randomFrom(VOICES); break
       case 'speechRate': result.speechRate = randomFrom(SPEECH_RATES); break
-      case 'musicVolume': result.musicVolume = parseFloat((Math.random() * 0.2 + 0.05).toFixed(2)); break
+      case 'musicVolume': result.musicVolume = parseFloat((Math.random() * 0.25 + 0.02).toFixed(2)); break
       case 'subtitleStyle': result.subtitleStyle = randomFrom(SUBTITLE_STYLES); break
       case 'subtitleColor': result.subtitleColor = randomFrom(SUBTITLE_COLORS); break
       case 'subtitleSize': result.subtitleSize = randomFrom(SUBTITLE_SIZES); break
@@ -123,10 +133,15 @@ function mutateGenome(genome: Genome, fieldsToMutate = randomInt(1, 3)): Genome 
       case 'backgroundSource': result.backgroundSource = randomFrom(BACKGROUND_SOURCES); break
       case 'musicGenre': result.musicGenre = randomFrom(MUSIC_GENRES); break
       case 'fontName': result.fontName = randomFrom(FONT_NAMES); break
-      case 'preferredSubreddits': result.preferredSubreddits = [randomFrom(SUBREDDITS), randomFrom(SUBREDDITS)]; break
-      case 'minRedditScore': result.minRedditScore = randomFrom([1000, 3000, 5000, 10000]); break
+      case 'preferredSubreddits': {
+        const count = randomInt(2, 4)
+        result.preferredSubreddits = Array.from({ length: count }, () => randomFrom(SUBREDDITS))
+          .filter((v, i, a) => a.indexOf(v) === i)
+        break
+      }
+      case 'minRedditScore': result.minRedditScore = randomFrom([500, 1000, 3000, 5000, 8000]); break
       case 'captionStyle': result.captionStyle = randomFrom(CAPTION_STYLES); break
-      case 'hashtagCount': result.hashtagCount = randomInt(5, 12); break
+      case 'hashtagCount': result.hashtagCount = randomInt(3, 15); break
     }
   }
   return result
@@ -188,7 +203,7 @@ export function evaluatePopulation(
   toReproduce: { parent: CM; childGenome: Genome; childId: string }[]
 } {
   const {
-    gracePeriodVideos = 5,
+    gracePeriodVideos = 3,
     minPopulation = 2,
     maxPopulation = 8,
     killThreshold = 0.30,
@@ -253,10 +268,25 @@ export async function runPopulationEvaluation(
   const rawCMs = getAllActiveCMs(db)
   const cms: CM[] = rawCMs.map(r => parseCM(r))
 
-  const { toKill, toReproduce } = evaluatePopulation(cms, opts)
+  // Fix 3: If all active CMs have 0 views, use avg eval_score as proxy
+  const allZeroViews = cms.filter(c => c.status !== 'dead').every(c => c.avg_views === 0 || c.total_views === 0)
+  let evalCms = cms
+  if (allZeroViews) {
+    logger.info('All CMs have 0 views — falling back to avg eval_score for Darwin evaluation')
+    evalCms = cms.map(cm => {
+      const row = db.prepare(
+        "SELECT AVG(eval_score) as avg_score FROM content WHERE cm_id = ? AND eval_score IS NOT NULL AND status IN ('ready', 'posted')"
+      ).get(cm.id) as { avg_score: number | null } | undefined
+      const avgScore = row?.avg_score ?? 0
+      return { ...cm, avg_views: avgScore }
+    })
+  }
+
+  const { toKill, toReproduce } = evaluatePopulation(evalCms, opts)
 
   const killed: string[] = []
   const reproduced: string[] = []
+  const reproducedParentIds = new Set<string>()
 
   for (const cm of toKill) {
     db.prepare("UPDATE cms SET status = 'dead', died_at = datetime('now'), death_reason = 'below_kill_threshold' WHERE id = ?")
@@ -283,7 +313,43 @@ export async function runPopulationEvaluation(
       plan,
     })
     reproduced.push(childId)
+    reproducedParentIds.add(parent.id)
     logger.info({ parentId: parent.id, childId, generation: parent.generation + 1 }, 'CM reproduced')
+  }
+
+  // Fix 4: Force evolution on high-video CMs that weren't already reproduced
+  const { maxPopulation = 8 } = opts
+  const activeCmsAfterKill = cms.filter(c => c.status !== 'dead' && !killed.includes(c.id))
+  const currentPopSize = activeCmsAfterKill.length + reproduced.length
+
+  for (const cm of activeCmsAfterKill) {
+    if (
+      cm.videos_generated >= 8 &&
+      !reproducedParentIds.has(cm.id) &&
+      currentPopSize + reproduced.length < maxPopulation
+    ) {
+      const childId = `cm-${nanoid(8)}`
+      const childGenome = mutateGenome(cm.genome)
+      let plan: string | undefined
+      try {
+        const result = await generateCMPlan(childId, childGenome)
+        if (result) plan = result
+        logger.info({ cmId: childId }, plan ? 'Plan generated for force-evolved child CM' : 'Plan generation returned null for force-evolved child CM')
+      } catch (err) {
+        logger.warn({ err, cmId: childId }, 'Plan generation failed for force-evolved child CM (non-blocking)')
+      }
+      insertCM(db, {
+        id: childId,
+        generation: cm.generation + 1,
+        parent_id: cm.id,
+        genome: JSON.stringify(childGenome),
+        status: 'active',
+        plan,
+      })
+      reproduced.push(childId)
+      reproducedParentIds.add(cm.id)
+      logger.info({ parentId: cm.id, childId, generation: cm.generation + 1 }, 'CM force-evolved (high video count)')
+    }
   }
 
   const updatedRaw = getAllActiveCMs(db)
